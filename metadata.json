@@ -1,0 +1,7 @@
+{
+  "name": "Zenith Focus Launcher",
+  "description": "A high-performance minimalist launcher. Reclaim your focus with a text-based interface, integrated focus tools, and essential utilities.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
