@@ -6,6 +6,7 @@ import AppDrawer from './components/AppDrawer';
 import FocusTimer from './components/FocusTimer';
 import Stats from './components/Stats';
 import Camera from './components/Camera';
+import Settings from './components/Settings';
 
 const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<Screen>(Screen.HOME);
@@ -22,6 +23,8 @@ const App: React.FC = () => {
         return <Stats onNavigate={setCurrentScreen} />;
       case Screen.CAMERA:
         return <Camera onNavigate={setCurrentScreen} />;
+      case Screen.SETTINGS:
+        return <Settings onNavigate={setCurrentScreen} />;
       default:
         return <Home onNavigate={setCurrentScreen} />;
     }
@@ -31,7 +34,7 @@ const App: React.FC = () => {
     <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
       {/* Container optimized for Mobile Viewport */}
       <div className="relative w-full h-full max-w-md bg-black shadow-2xl overflow-hidden md:h-[850px] md:max-h-[90vh] md:rounded-[3rem] md:border-[12px] md:border-zinc-900">
-        
+
         {/* Notch / Status Bar Area */}
         <div className="h-10 px-8 flex justify-between items-center text-[10px] text-white/30 font-light tracking-tighter pt-safe">
           <span>ZENITH</span>

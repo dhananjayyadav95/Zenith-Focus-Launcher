@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Screen } from '../types';
+import { Screen, FocusSession } from '../types';
 import { ArrowLeft, Play, Pause, X, CheckCircle, AlertTriangle, Edit3, BellOff, Bell } from 'lucide-react';
+import { saveFocusSession } from '../services/storageService';
 
 interface FocusTimerProps {
   onNavigate: (screen: Screen) => void;
@@ -17,10 +18,12 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isFinished, setIsFinished] = useState(false);
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
-  
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [sessionStartTime, setSessionStartTime] = useState<number | null>(null);
+
   // Exit confirmation state
   const [showExitConfirm, setShowExitConfirm] = useState(false);
-  const [exitStep, setExitStep] = useState(0); 
+  const [exitStep, setExitStep] = useState(0);
   const [exitInput, setExitInput] = useState('');
   const exitInputRef = useRef<HTMLInputElement>(null);
   const customInputRef = useRef<HTMLInputElement>(null);
@@ -66,13 +69,27 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
         setTimeLeft((prev) => prev - 1);
       }, 1000);
     } else if (timeLeft === 0 && isActive) {
+      // Session completed
       setIsActive(false);
       setIsFinished(true);
       sendFinishNotification();
+
+      // Save completed session
+      if (currentSessionId && sessionStartTime) {
+        const session: FocusSession = {
+          id: currentSessionId,
+          duration: isCustom ? parseInt(customInput) : selectedMinutes,
+          startTime: sessionStartTime,
+          endTime: Date.now(),
+          completed: true,
+        };
+        saveFocusSession(session);
+      }
+
       clearInterval(interval);
     }
     return () => clearInterval(interval);
-  }, [isActive, timeLeft, showExitConfirm]);
+  }, [isActive, timeLeft, showExitConfirm, currentSessionId, sessionStartTime, isCustom, customInput, selectedMinutes]);
 
   useEffect(() => {
     if (showExitConfirm && exitInputRef.current) {
@@ -93,6 +110,18 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
   };
 
   const handleReset = () => {
+    // Save incomplete session if exists
+    if (currentSessionId && sessionStartTime && isActive) {
+      const session: FocusSession = {
+        id: currentSessionId,
+        duration: isCustom ? parseInt(customInput) : selectedMinutes,
+        startTime: sessionStartTime,
+        endTime: Date.now(),
+        completed: false,
+      };
+      saveFocusSession(session);
+    }
+
     setIsActive(false);
     const mins = isCustom ? (parseInt(customInput) || 25) : selectedMinutes;
     setTimeLeft(mins * 60);
@@ -100,6 +129,8 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
     setShowExitConfirm(false);
     setExitStep(0);
     setExitInput('');
+    setCurrentSessionId(null);
+    setSessionStartTime(null);
   };
 
   const initiateExit = () => {
@@ -146,13 +177,13 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
         <CheckCircle size={80} className="text-white mb-6" strokeWidth={1} />
         <h2 className="text-4xl font-light mb-4">Focus Complete</h2>
         <p className="text-white/50 mb-12">Session ended. Re-center yourself.</p>
-        <button 
+        <button
           onClick={handleReset}
           className="px-8 py-3 border border-white/20 hover:bg-white hover:text-black transition-all rounded-full uppercase tracking-widest text-sm"
         >
           Again
         </button>
-        <button 
+        <button
           onClick={() => onNavigate(Screen.HOME)}
           className="mt-6 text-white/30 hover:text-white underline underline-offset-8"
         >
@@ -170,7 +201,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
           <AlertTriangle size={48} className="text-white/40 mb-6" strokeWidth={1} />
           <h2 className="text-2xl font-light mb-2">Break focus?</h2>
           <p className="text-white/40 text-sm mb-8">Type <span className="text-white font-mono">'yes'</span> to confirm ({exitStep}/3)</p>
-          
+
           <form onSubmit={handleExitStepSubmit} className="w-full max-w-xs">
             <input
               ref={exitInputRef}
@@ -183,7 +214,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
             />
           </form>
 
-          <button 
+          <button
             onClick={cancelExit}
             className="mt-12 text-white/30 hover:text-white uppercase tracking-widest text-xs"
           >
@@ -204,7 +235,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
           </h2>
         </div>
         {!isActive && (
-          <button 
+          <button
             onClick={requestNotificationPermission}
             className={`p-2 transition-colors ${notificationPermission === 'granted' ? 'text-white/40' : 'text-blue-400'}`}
             title={notificationPermission === 'granted' ? 'Alerts enabled' : 'Enable alerts'}
@@ -223,9 +254,8 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
                   <button
                     key={min}
                     onClick={() => setSelectedMinutes(min)}
-                    className={`text-xl font-light transition-all duration-300 ${
-                      selectedMinutes === min ? 'text-white border-b border-white/40' : 'text-white/20 hover:text-white/40'
-                    }`}
+                    className={`text-xl font-light transition-all duration-300 ${selectedMinutes === min ? 'text-white border-b border-white/40' : 'text-white/20 hover:text-white/40'
+                      }`}
                   >
                     {min}
                   </button>
@@ -247,7 +277,7 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
                   placeholder="Mins"
                   className="w-24 bg-transparent border-b border-white text-center text-4xl font-light focus:ring-0 focus:outline-none placeholder:text-white/10"
                 />
-                <button 
+                <button
                   onClick={() => setIsCustom(false)}
                   className="text-white/30 hover:text-white uppercase text-[10px] tracking-widest mt-4"
                 >
@@ -261,12 +291,17 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
         <div className={`text-8xl mono font-extralight tracking-tighter mb-12 transition-all duration-500 ${isActive ? 'scale-125' : 'scale-100'}`}>
           {formatTime(timeLeft)}
         </div>
-        
+
         <div className="flex items-center gap-12">
           {!isActive ? (
-            <button 
+            <button
               onClick={() => {
                 if (parseInt(customInput) > 0 || !isCustom) {
+                  // Create new session
+                  const sessionId = `session_${Date.now()}`;
+                  setCurrentSessionId(sessionId);
+                  setSessionStartTime(Date.now());
+
                   if (notificationPermission === 'default') {
                     requestNotificationPermission().then(() => setIsActive(true));
                   } else {
@@ -280,13 +315,13 @@ const FocusTimer: React.FC<FocusTimerProps> = ({ onNavigate }) => {
             </button>
           ) : (
             <>
-              <button 
+              <button
                 onClick={() => setIsActive(false)}
                 className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center hover:border-white transition-all"
               >
                 <Pause size={24} fill="currentColor" />
               </button>
-              <button 
+              <button
                 onClick={initiateExit}
                 className="w-16 h-16 rounded-full border border-white/10 flex items-center justify-center hover:border-white transition-all"
               >
